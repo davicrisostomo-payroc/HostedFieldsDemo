@@ -1,0 +1,447 @@
+<!doctype html>
+<html lang="en">
+
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Form Layout</title>
+  <link rel="stylesheet" href="../view/css/style.css">
+  <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.7.1/jquery.min.js"></script>
+  <script src="https://cdn.uat.payroc.com/js/hosted-fields/hosted-fields-1.2.0-beta.135020.js"
+    integrity="sha384-Ni4VysNB8m8E1MfkB9IRrXOUFNdSvpwJC3LeyuYCgP3uV1CVrLOSHyemXjUczSSU"
+    crossorigin="anonymous"></script>
+  <script src="../api_client.js"></script>
+  <script src="../view/js/hosted_fields_manager.js"></script>
+</head>
+
+<body>
+  <div class="form-container">
+    <div class="spinner" id="spinner" style="display: none;"></div>
+    <div class="configuration">
+      <!-- X-Api-Key -->
+      <div class="row">
+        <div>
+          <label for="x-api-key">X-Api-Key:</label>
+          <input type="text" class="input-box" id="x-api-key" required>
+          <div class="error" id="x-api-key-error">Invalid X-Api-Key</div>
+        </div>
+      </div>
+
+      <!-- Terminal ID -->
+      <div class="row">
+        <div>
+          <label for="terminal-id">Terminal ID:</label>
+          <input type="number" class="input-box" id="terminal-id" required>
+          <div class="error" id="terminal-id-error">Invalid Terminal ID</div>
+        </div>
+      </div>
+      <!-- Payment Method (Payload Type) -->
+      <div class="row" style="margin-bottom: 10px; display: flex; gap: 5px;">
+        <label for="card" style="margin-right: 10px;">Payload Type:</label>
+        <div style="display: inline-flex; align-items: center; margin-right: 2px;">
+          <input type="radio" id="card" name="hf_method" value="card" checked>
+          <label for="card" style="margin-left: 5px;">Card</label>
+        </div>
+        <div style="display: inline-flex; align-items: center; margin-right: 2px;">
+          <input type="radio" id="ach" name="hf_method" value="ach">
+          <label for="ach" style="margin-left: 5px;">ACH</label>
+        </div>
+        <div style="display: inline-flex; align-items: center;">
+          <input type="radio" id="pad" name="hf_method" value="pad">
+          <label for="pad" style="margin-left: 5px;">PAD</label>
+        </div>
+      </div>
+      <!-- Request Type -->
+      <div class="row" style="margin-bottom: 2px; display: flex; gap: 5px;">
+        <label for="card" style="margin-right: 8px;">Request Type:</label>
+        <div style="display: inline-flex; align-items: center; margin-right: 2px;">
+          <input type="radio" id="payment" name="hf_scenario" value="payment" checked>
+          <label for="payment">Payment</label>
+        </div>
+        <div style="display: inline-flex; align-items: center; margin-right: 2px;">
+          <input type="radio" id="tokenization" name="hf_scenario" value="tokenization">
+          <label for="tokenization">Tokenization</label>
+        </div>
+      </div>
+      <!-- Amount -->
+      <div class="row">
+        <div>
+          <label for="amount">Amount:</label>
+          <input type="number" class="input-box" id="amount" value="100">
+          <div class="error" id="amount-error">Invalid Amount</div>
+        </div>
+      </div>
+
+      <!-- Currency -->
+      <div class="row">
+        <div>
+          <label for="currency">Currency:</label>
+          <select class="input-box" id="currency" required>
+            <option value="USD" selected>USD</option>
+            <option value="CAD">CAD</option>
+            <option value="GBP">GBP</option>
+            <option value="EUR">EUR</option>
+          </select>
+        </div>
+      </div>
+
+      <!-- Submit Button -->
+      <div class="row" style="margin-top: 15px;">
+        <div>
+          <button type="button" onclick="handleSubmit();">Generate Fields</button>
+        </div>
+      </div>
+    </div>
+    <div class="customer-details" style="display: none;">
+      <div class="billing-details"></div>
+      <div class="contact-methods"></div>
+    </div>
+    <div class="pyrc-hosted-fields" style="display: none;"></div>
+    <pre id="display-result"></pre>
+    <div id="display-error"></div>
+  </div>
+  <script>
+
+    let xApiKey, method, scenario, terminalId, currency, amount, hf;
+
+    async function handleSubmit(event) {
+      setFields();
+      if (!validateFields()) return;
+
+      const spinner = document.getElementById("spinner");
+      spinner.style.display = "block"; // Show spinner
+      const fields = getFieldsObject();
+      try {
+        let errorMessage;
+        const hostedFields = getHostedFieldsManager();
+        hf = hostedFields;
+        document.querySelector('.configuration').style.display = 'none';
+        addCustomerDetails();
+        addMethodDiv();
+        await hostedFields.initialize(scenario, fields, method, terminalId, currency, amount);
+      } catch (error) {
+        errorMessage = error;
+      } finally {
+        if (typeof errorMessage !== 'undefined') {
+          const result = document.getElementById('display-error');
+          result.innerHTML = errorMessage + `<p><button onClick="window.location.reload();" style="margim-top:15px;">Refresh Page</button>`;
+        } else {
+          document.querySelector('.customer-details').style.display = 'block';
+          document.querySelector('.pyrc-hosted-fields').style.display = 'block';
+        }
+        spinner.style.display = "none"; // Hide spinner
+      }
+    }
+
+    function setFields() {
+      xApiKey = document.querySelector("input#x-api-key").value;
+      method = document.querySelector("input[name=hf_method]:checked").value;
+      scenario = document.querySelector("input[name=hf_scenario]:checked").value;
+      terminalId = document.querySelector("input#terminal-id").value;
+      currency = document.querySelector("select#currency").value;
+      amount = document.querySelector("input#amount").value;
+    }
+
+    function validateFields() {
+      let validation = true;
+      if (!xApiKey) {
+        displayMissingFieldsError("x-api-key");
+        validation = false;
+      }
+      if (!terminalId) {
+        displayMissingFieldsError("terminal-id");
+        validation = false;
+      }
+      if (scenario === 'payment' && (!amount || amount <= 0)) {
+        displayMissingFieldsError("amount");
+        validation = false;
+      }
+      return validation;
+    }
+
+    function displayMissingFieldsError(id) {
+      const input = document.getElementById(id);
+      const errorMessage = document.getElementById(id + "-error");
+      input.classList.add('invalid');
+
+      console.log(input);
+      errorMessage.style.visibility = 'visible';  // Show the error message
+      setTimeout(() => {
+        input.classList.remove('invalid');
+        errorMessage.style.visibility = 'hidden'; // Hide it again after 5 seconds
+      }, 5000); // 5000 ms = 5 seconds
+    }
+
+    function getHostedFieldsInitializer() {
+      const apiClient = new ApiClient(xApiKey);
+      return new HostedFieldsInitializer(apiClient);
+    }
+
+    function addCustomerDetails() {
+      const contactContainer = document.querySelector('.contact-methods');
+      contactContainer.innerHTML = `
+        <div>
+          <label for="email">Email</label>
+          <input class="input-box" type="text" id="email" required>
+          <div class="error" id="email-error">*Mandatory</div>
+        </div>
+        <div>
+          <label for="mobile">Mobile Number</label>
+          <input class="input-box" type="tel" id="mobile" >
+          <div class="error" id="mobile-error">*Mandatory</div>
+        </div>`;
+
+      if (method === 'card') {
+        const billingContainer = document.querySelector('.billing-details');
+        billingContainer.innerHTML = `
+        <!-- First Name and Last Name -->
+    <div class="row" style="margin-bottom: -13px;">
+      <div>
+        <label for="firstName">First Name</label>
+        <input class="input-box" type="text" id="firstName" required>
+        <div class="error" id="firstName-error">*Mandatory</div>
+      </div>
+      <div>
+        <label for="lastName">Last Name</label>
+        <input class="input-box" type="text" id="lastName" required>
+        <div class="error" id="lastName-error">*Mandatory</div>
+      </div>
+    </div>
+    <!-- Street Address 1 -->
+    <div>
+      <label for="address1">Street Address</label>
+      <input class="input-box" type="text" id="address1" required>
+      <div class="error" id="address1-error">*Mandatory</div>
+    </div>
+    <!-- Street Address 2 -->
+    <div>
+      <label for="address2">Street Address 2</label>
+      <input class="input-box" type="text" id="address2">
+      <div></div>
+    </div>
+    <!-- City and Postal Code -->
+    <div class="row"  style="margin-bottom: -13px;">
+      <div>
+        <label for="city">City</label>
+        <input class="input-box" type="text" id="city" required>
+        <div class="error" id="city-error">*Mandatory</div>
+      </div>
+      <div>
+        <label for="postalCode">Postal Code</label>
+        <input class="input-box" type="text" id="postalCode" required>
+        <div class="error" id="postalCode-error">*Mandatory</div>
+      </div>
+    </div>
+    <!-- Country-->
+    <div class="container">
+      <label for="country">Country</label>
+      <select class="input-box" id="country">
+        <option value="GB">Great Britain (GB)</option>
+        <option value="IE">Republic of Ireland (IE)</option>
+        <option value="US">United States (US)</option>
+        <option value="CA">Canada (CA)</option>
+        <option value="BR">Brazil (BR)</option>
+      </select>
+    </div>`;
+      }
+    }
+
+    function addMethodDiv() {
+      const formContainer = document.querySelector('.pyrc-hosted-fields');
+      if (method === 'card') {
+        formContainer.innerHTML = `
+            <div class="card-container payroc-form">
+                <label for="card-holder-name">Cardholder Name</label>
+                <div class="card-holder-name"></div>
+                <div class="card-holder-name-error error-message"></div>
+                <label for="card-number">Card Number</label>
+                <div class="card-number"></div>
+                <div class="card-number-error error-message"></div>
+                <div id="surcharge-disclosure" style="display: none"></div>
+                <div class="line-item" id="surcharge-line-item" style="display: none">
+                    <div class="description">Surcharge fee:</div>
+                    <div class="price"></div>
+                </div>
+                <div class="line-item" id="total-line-item" style="display: none">
+                    <div class="description">Total amount:</div>
+                    <div class="price"></div>
+                </div>
+                <div class="row">
+                    <div>
+                        <label for="card-expiry">Expires (MM/YY)</label>
+                        <div class="card-expiry"></div>
+                        <div class="card-expiry-error error-message"></div>
+                    </div>
+                    <div class="card-cvv-wrapper">
+                        <div>
+                            <label for="card-cvv">CVV</label>
+                            <div class="card-cvv"></div>
+                            <div class="card-cvv-error error-message"></div>
+                        </div>
+                    </div>
+                </div>
+                <div class="card-submit submit-button"></div>
+            </div>`;
+      } else if (method === 'ach') {
+        formContainer.innerHTML = `
+            <div class="ach-container payroc-form">
+                <label for="ach-account-holder">Accountholder Name</label>
+                <div class="ach-account-holder"></div>
+                <div class="ach-account-holder-error error-message"></div>
+                <label for="ach-account-type">Account Type</label>
+                <div class="ach-account-type"></div>
+                <div class="ach-account-type-error error-message"></div>
+                <label for="ach-account-number">Account Number</label>
+                <div class="ach-account-number"></div>
+                <div class="ach-account-number-error error-message"></div>
+                <label for="ach-routing-number">Routing Number</label>
+                <div class="ach-routing-number"></div>
+                <div class="ach-routing-number-error error-message"></div>
+                <div class="ach-submit submit-button"></div>
+            </div>`;
+      } else if (method === 'pad') {
+        formContainer.innerHTML = `
+            <div class="pad-container payroc-form">
+                <label for="pad-account-holder">Accountholder Name</label>
+                <div class="pad-account-holder"></div>
+                <div class="pad-account-holder-error error-message"></div>
+                <label for="pad-account-holder">Account Number</label>
+                <div class="pad-account-number"></div>
+                <div class="pad-account-number-error error-message"></div>
+                <label for="pad-institution-number">Institution Number</label>
+                <div class="pad-institution-number"></div>
+                <div class="pad-institution-number-error error-message"></div>
+                <label for="pad-transit-number">Transit Number</label>
+                <div class="pad-transit-number"></div>
+                <div class="pad-transit-number-error error-message"></div>
+                <div class="pad-submit submit-button"></div>
+            </div>`;
+      }
+    }
+
+    function getFieldsObject() {
+      if (method === 'card') {
+        return {
+          card: {
+            cardholderName: {
+              target: ".card-holder-name",
+              errorTarget: ".card-holder-name-error",
+              placeholder: "Cardholder Name",
+            },
+            cardNumber: {
+              target: ".card-number",
+              errorTarget: ".card-number-error",
+              placeholder: "1234 5678 1234 1211",
+            },
+            cvv: {
+              wrapperTarget: ".card-cvv-wrapper",
+              target: ".card-cvv",
+              errorTarget: ".card-cvv-error",
+              placeholder: "CVV",
+            },
+            expiryDate: {
+              target: ".card-expiry",
+              errorTarget: ".card-expiry-error",
+              placeholder: "MM/YY",
+            },
+            submit: {
+              target: ".card-submit.submit-button",
+              value: "Pay Now",
+            },
+          },
+        }
+      }
+      if (method === 'ach') {
+        return {
+          ach: {
+            nameOnAccount: {
+              target: ".ach-account-holder",
+              errorTarget: ".ach-account-holder-error",
+              placeholder: "Accountholder Name",
+            },
+            accountType: {
+              target: ".ach-account-type",
+              errorTarget: ".ach-account-type-error",
+            },
+            achAccountNumber: {
+              target: ".ach-account-number",
+              errorTarget: ".ach-account-number-error",
+              placeholder: "Account Number",
+            },
+            routingNumber: {
+              target: ".ach-routing-number",
+              errorTarget: ".ach-routing-number-error",
+              placeholder: "Routing Number",
+            },
+            submit: {
+              target: ".ach-submit.submit-button",
+              value: "Submit",
+            },
+          },
+        }
+      }
+      if (method === 'pad') {
+        return {
+          pad: {
+            nameOnAccount: {
+              target: ".pad-account-holder",
+              errorTarget: ".pad-account-holder-error",
+              placeholder: "Accountholder Name",
+            },
+            padAccountNumber: {
+              target: ".pad-account-number",
+              errorTarget: ".pad-account-number-error",
+              placeholder: "Account Number",
+            },
+            institutionNumber: {
+              target: ".pad-institution-number",
+              errorTarget: ".pad-institution-number-error",
+              placeholder: "Institution Number",
+            },
+            transitNumber: {
+              target: ".pad-transit-number",
+              errorTarget: ".pad-transit-number-error",
+              placeholder: "Transit Number",
+            },
+            submit: {
+              target: ".pad-submit.submit-button",
+              value: "Submit",
+            },
+          },
+        }
+      }
+    }
+
+    document.addEventListener('DOMContentLoaded', () => {
+      const paymentOption = document.getElementById('payment');
+      const tokenizationOption = document.getElementById('tokenization');
+      const amountFieldContainer = document.getElementById('amount');
+      const currencyFieldContainer = document.getElementById('currency');
+
+      const toggleFields = () => {
+        if (paymentOption.checked) {
+          // Enable the div containers and their children
+          amountFieldContainer.style.pointerEvents = 'auto'; // Enable interactions
+          currencyFieldContainer.style.pointerEvents = 'auto'; // Enable interactions
+          amountFieldContainer.style.opacity = '1'; // Full opacity
+          currencyFieldContainer.style.opacity = '1'; // Full opacity
+        } else if (tokenizationOption.checked) {
+          // Disable the div containers and their children
+          amountFieldContainer.style.pointerEvents = 'none'; // Disable interactions
+          currencyFieldContainer.style.pointerEvents = 'none'; // Disable interactions
+          amountFieldContainer.style.opacity = '0.5'; // Make it appear disabled
+          currencyFieldContainer.style.opacity = '0.5'; // Make it appear disabled
+        }
+      };
+
+      // Add event listeners to the radio buttons
+      paymentOption.addEventListener('change', toggleFields);
+      tokenizationOption.addEventListener('change', toggleFields);
+
+      // Initialize the state on page load
+      toggleFields();
+    });
+  </script>
+</body>
+
+</html>
