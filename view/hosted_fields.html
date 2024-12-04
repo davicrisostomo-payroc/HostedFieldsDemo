@@ -96,7 +96,7 @@
       <div class="billing-details"></div>
       <div class="contact-methods"></div>
     </div>
-    <div class="pyrc-hosted-fields" style="display: none;"></div>
+    <div class="pyrc-hosted-fields"></div>
     <pre id="display-result"></pre>
     <div id="display-error"></div>
   </div>
@@ -172,9 +172,9 @@
       }, 5000); // 5000 ms = 5 seconds
     }
 
-    function getHostedFieldsInitializer() {
+    function getHostedFieldsManager() {
       const apiClient = new ApiClient(xApiKey);
-      return new HostedFieldsInitializer(apiClient);
+      return new HostedFieldsManager(apiClient);
     }
 
     function addCustomerDetails() {
