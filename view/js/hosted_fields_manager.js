@@ -46,8 +46,8 @@ class HostedFieldsManager {
         this.form.on("submissionSuccess", async ({ token, expiresAt }) => {
             const customer = this._getCustomerObject();
             const response = scenario === "payment"
-                ? await this.serverSimulator.createPayment(method, terminalId, customer, currency, amount, token)
-                : await this.serverSimulator.createSecureToken(terminalId, customer, token);
+                ? await this.apiClient.createPayment(method, terminalId, customer, currency, amount, token)
+                : await this.apiClient.createSecureToken(terminalId, customer, token);
 
 
             document.querySelector('.customer-details').style.display = "none";
